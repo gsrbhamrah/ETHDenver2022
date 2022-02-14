@@ -1,8 +1,9 @@
 // SPDX-License-Identifier: MITs
 
-pragma solidity >=0.6.0 <0.8.0;
+pragma solidity ^0.8.0;
 
-import "./IERC20.sol";
+
+import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 // ----------------------------------------------------------------------------
 // Safe Math Library
@@ -56,21 +57,21 @@ contract Dagecoin is IERC20, SafeMath {
     /**
      * @dev Returns the name of the token.
      */
-    function name() public override view returns (string memory) {
+    function name() public view returns (string memory) {
         return _name;
     }
 
     /**
      * @dev Returns the symbol of the token.
      */
-    function symbol() public override view returns (string memory) {
+    function symbol() public view returns (string memory) {
         return _symbol;
     }
 
     /**
      * @dev Returns the decimals places of the token.
      */
-    function decimals() public override view returns (uint8) {
+    function decimals() public view returns (uint8) {
         return _decimals;
     }
     
