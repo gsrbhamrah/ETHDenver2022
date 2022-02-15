@@ -3,7 +3,7 @@ pragma solidity ^0.8.0;
  
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 
-contract RentToken is ERC20 {
+contract DebtCoin is ERC20 {
 
     address private _bank;
 

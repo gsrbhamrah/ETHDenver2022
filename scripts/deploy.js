@@ -14,7 +14,7 @@ async function main() {
   // await hre.run('compile');
 
   // We get the contract to deploy
-  const Coin = await hre.ethers.getContractFactory("Dagecoin");
+  const Coin = await hre.ethers.getContractFactory("BorrowCoin");
   const coin = await Coin.deploy();
 
   await coin.deployed();
