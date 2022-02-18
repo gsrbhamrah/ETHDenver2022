@@ -12,7 +12,9 @@ contract Bank {
   IERC20 public debt;
 
   //add mappings
-  mapping(address => uint) public collateralBalanceOf;
+  mapping(address => uint256) public collateralBalanceOf;
+  mapping(address => uint256) public currentLoan;
+  mapping(address => uint256) public credit; // recorded as % of collateral
 
   //add events
   event Deposit (
@@ -23,12 +25,14 @@ contract Bank {
     address indexed user,
     uint256 amount
   );
-  /*event Borrow (
+  event Borrow (
     address indexed user, 
-    uint256 collateralEtherAmount, 
-    uint256 borrowedTokenAmount
+    uint256 newLoan,
+    uint256 totalLoan,
+    uint256 creditLimit,
+    uint256 totalUncollateralized
   );
-  event PayOff (
+  /*event PayOff (
     address indexed user,
     uint256 interest
   );*/
@@ -72,27 +76,32 @@ contract Bank {
     emit Withdraw(msg.sender, remainingBalance);
   }
 
-  /*function borrow() payable public {
-    //check if collateral is >= than 0.01 ETH
-    require(msg.value >= 1e16, 'Error, collateral must be >= 0.01 ETH');
-    //check if user doesn't have active loan
-    require(isBorrowed[msg.sender] == false, 'Error, loan already taken');
+  function borrow(uint256 amount) payable {
+    // check if borrowing amount would exceed limit
+    uint256 requestedLoan = currentLoan[msg.sender] + amount;
+    uint256 borrowingLimit = collateralBalanceOf[msg.sender] + credit[msg.sender] * collateralBalanceOf[msg.sender] / 100; 
+      // eg limit = 500 + 1 * 500 / 100 = $505
+    require(requestedLoan <= borrowingLimit , 'Error, borrowing would exceed limit.');
 
-    //add msg.value to ether collateral (locked until loan payed off)
-    collateralEther[msg.sender] = collateralEther[msg.sender] + msg.value;
+    // mint tokens user is borrowing that exceed collateral amount
+    if (requestedLoan > collateralBalanceOf[msg.sender]) {
 
-    //calc tokens amount to mint, 50% of msg.value
-    uint tokensToMint = collateralEther[msg.sender] / 2;
+      tokensToMint = requestedLoan - collateralBalanceOf[msg.sender] - debt.balanceOf(msg.sender); 
+        // eg mint = 101 - 100 - 0 = 1     user had no previous debt
+        // or mint = 105 - 100 - 2 = 3     user already has debt = 2
+      coin.mint(tokensToMint);
+      debt.mint(msg.sender, tokensToMint);
+    }
 
-    //mint&send tokens to user
-    token.mint(msg.sender, tokensToMint);
+    // lend tokens to user
+    coin.transfer(msg.sender, amount);
 
-    //activate borrower's loan status
-    isBorrowed[msg.sender] = true;
+    // record users loan
+    currentLoan[msg.sender] = requestedLoan;
 
-    //emit event
-    emit Borrow(msg.sender, collateralEther[msg.sender], tokensToMint);
-  }*/
+    //emit event (user, new loan, total loan, credit limit, amount uncollateralized)
+    emit Borrow(msg.sender, amount, currentLoan[msg.sender], borrowingLimit, debt.balanceOf(msg.sender));
+  }
 
   /*function payOff() public {
     //check if loan is active
