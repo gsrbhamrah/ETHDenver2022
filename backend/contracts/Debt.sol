@@ -2,22 +2,29 @@
 pragma solidity ^0.8.0;
  
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
+import "@openzeppelin/contracts/access/Ownable.sol";
 
-contract DebtCoin is ERC20 {
+contract Debt is ERC20, Ownable {
 
-    address private _bank;
+    address[] private _banks;
 
-    modifier onlyBank {
-        require(msg.sender == _bank);
+    modifier onlyBanks {
+        bool isBank = false;
+        for (uint256 i = 0; i < _banks.length(); i++) {
+            if (_banks[i] == msg.sender) {
+                isBank = true;
+            }
+        }
+        require(isBank);
         _;
     }
  
-    // name example: "OurBankName debt" 
-    constructor(address bank_, string memory name_) ERC20(name_, "DEBT") {
+    constructor() ERC20("Universal tokenized debt", "DEBT") {}
 
-        _bank = bank_;
+    function addBank(address bank) public OnlyOwner {
+
+        _banks.add(bank);
     }
-
 
     /* * * * * * * * * * * * * * * BANK ONLY FUNCTIONS * * * * * * * * * * * * * * */
 
@@ -25,7 +32,7 @@ contract DebtCoin is ERC20 {
     * the bank will mint tokens to a debtor when:
     *   the debtor borrows more tokens then their deposited collateral
     */
-    function mint(address debtor, uint256 amount) public onlyBank {
+    function mint(address debtor, uint256 amount) public onlyBanks {
         
         _mint(debtor, amount); // erc20 mint
     }
@@ -34,7 +41,7 @@ contract DebtCoin is ERC20 {
     * the bank will burn a debtors tokens when:
     *   the debtor repays any tokens that were borrowed beyond their collateral amount
     */
-    function burn(address debtor, uint256 amount) public onlyBank {
+    function burn(address debtor, uint256 amount) public onlyBanks {
         
         _burn(debtor, amount); // erc20 burn
     }
@@ -46,7 +53,7 @@ contract DebtCoin is ERC20 {
         return false;
     }
 
-    function approve(address spender, uint256 amount) public virtual override returns (bool) {       address owner = _msgSender();
+    function approve(address spender, uint256 amount) public virtual override returns (bool) {       
 
         return false;
     }
@@ -68,8 +75,8 @@ contract DebtCoin is ERC20 {
 
     /* * * * * * * * * * * * * * * GASLESS VIEW FUNCTIONS * * * * * * * * * * * * * * */
 
-    function bank() external view returns(address) {
+    function banks() external view returns(address[]) {
         
-        return _bank;
+        return _banks;
     }
 }
