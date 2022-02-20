@@ -30,14 +30,19 @@ contract Bank {
   );
   event Borrow (
     address indexed user, 
-    uint256 ammountBorrowed,
+    uint256 amountBorrowed,
     uint256 totalBorrowed,
     uint256 borrowingLimit,
     uint256 amountUncollateralized,
-    uint256 loanStart
+    uint256 timestamp
   );
   event PayOff (
-    address indexed user
+    address indexed user,
+    uint256 totalPayed,
+    uint256 interestPayed,
+    uint256 uncollateralizedPayed,
+    uint256 remainingBorrowed,
+    uint256 timestamp
   );
 
   constructor(IERC20 _collateral, Debt _debt) {
@@ -85,7 +90,7 @@ contract Bank {
     emit Withdraw(msg.sender, remainingBalance, collateralBalanceOf[msg.sender]);
   }
 
-  function borrow(uint256 amount) payable {
+  function borrow(uint256 amount) public {
     // check if borrowing amount would exceed limit
     uint256 requestedLoan = currentLoan[msg.sender] + amount;
     uint256 borrowingLimit = collateralBalanceOf[msg.sender] + credit[msg.sender] * collateralBalanceOf[msg.sender] / 100; 
@@ -95,9 +100,9 @@ contract Bank {
     // mint tokens user is borrowing that exceed collateral amount
     if (requestedLoan > collateralBalanceOf[msg.sender]) {
 
-      tokensToMint = requestedLoan - collateralBalanceOf[msg.sender] - debt.balanceOf(msg.sender); 
-        // eg mint = 101 - 100 - 0 = 1     user had no previous debt
-        // or mint = 105 - 100 - 2 = 3     user already has debt = 2
+      tokensToMint = requestedLoan - (collateralBalanceOf[msg.sender] + debt.balanceOf(msg.sender)); 
+        // eg mint = 101 - (100 + 0) = 1     user had no previous debt
+        // or mint = 105 - (100 + 2) = 3     user already has debt = 2
       fides.mint(tokensToMint);
       debt.mint(msg.sender, tokensToMint);
     }
@@ -128,7 +133,7 @@ contract Bank {
     require(amount >= cumulativeInterest, 'Error, amount is below the minimum payment');
 
     uint256 totalOwed = currentLoan[msg.sender] + cumulativeInterest; // user owes loan and interest
-    uint256 remainingAmount = amount - cumulativeInterest; // interest is paid off "first"
+    uint256 amountAfterInterest = amount - cumulativeInterest; // interest is paid off "first"
     uint256 uncollateralizedPayOff = debt.balanceOf(msg.sender); // assume user is paying off entire uncollateralized loan
     uint256 newLoanStart = 0; // assume user is paying off entire loan, so loan timestamp will be cleared
     
@@ -136,8 +141,8 @@ contract Bank {
       amount = totalOwed; // user doesnt pay too much
     } else { // user is not paying the entire amount owed
       if (uncollateralizedPayOff > 0) { // part of the loan is uncollateralized
-        if (remainingAmount <= uncollateralizedPayOff) { // payment is less than uncollateralized loan
-          uncollateralizedPayOff = remainingAmount; // user will still have some debt after this payment
+        if (amountAfterInterest <= uncollateralizedPayOff) { // payment is less than uncollateralized loan
+          uncollateralizedPayOff = amountAfterInterest; // user will still have some debt after this payment
         } 
       } 
       newLoanStart = block.timestamp; // reset timestamp to calculate future interest
@@ -146,10 +151,10 @@ contract Bank {
     fides.transferFrom(msg.sender, address(this), amount);
     debt.burn(msg.sender, uncollateralizedPayOff); 
     fides.burn(cumulativeInterest + uncollateralizedPayOff);
-    currentLoan[msg.sender] = currentLoan[msg.sender] - remainingAmount;
+    currentLoan[msg.sender] = currentLoan[msg.sender] - amountAfterInterest;
     loanStart[msg.sender] = newLoanStart;
     
     //emit event
-    emit PayOff(msg.sender);
+    emit PayOff(msg.sender, amount, cumulativeInterest, uncollateralizedPayOff, currentLoan[msg.sender], loanStart[msg.sender]);
   }
 }
