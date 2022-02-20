@@ -3,7 +3,8 @@ pragma solidity ^0.8.0;
  
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
 
-contract BorrowCoin is ERC20 {
+
+contract Fides is ERC20 {
 
     address private _bank;
 
@@ -12,7 +13,7 @@ contract BorrowCoin is ERC20 {
         _;
     }
  
-    constructor(address bank_, string memory name_, string memory symbol_) ERC20(name_, symbol_) {
+    constructor(address bank_) ERC20("Fides dollar osculating borrowing token", "FIDES") {
 
         _bank = bank_;
     }
