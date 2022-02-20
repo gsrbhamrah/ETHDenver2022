@@ -74,6 +74,7 @@ contract Bank {
   function withdraw(uint256 amount) public {
     // make sure user does not withdraw too much
     require(amount <= collateralBalanceOf(msg.sender), 'Error, cannot withdraw more than deposited');
+    require(currentLoan[msg.sender] == 0, 'Error, must pay off loan before collateral can be withdrawn');
     
     // assign msg.sender ether deposit balance to variable for event
     uint256 remainingBalance = collateralBalanceOf[msg.sender] - amount;
@@ -119,31 +120,24 @@ contract Bank {
   }
 
   function payOff(uint256 amount) public {
-    // cumulative interest calc can be compressed into 1 line of code, seperated for readability
-    uint256 interestPerYear = currentLoan[msg.sender] * 0.08; // 8% of users loan
-    uint256 interestPerSecond = interestPerYear / 31557600; // 31557600 seconds = 365.25 days = 1 year
-    uint256 depositTime = block.timestamp - loanStart[msg.sender]; // # seconds user has borrowed 
-    uint256 cumulativeInterest = interestPerSecond * depositTime;
-
     // check if loan is active
     require(currentLoan[msg.sender] > 0, 'Error, loan not active');
     // check user has enough to repay
     require(fides.balanceOf(msg.sender) >= amount, 'Error, you dont have enough FIDES');
     // minimum payoff is cumulativeInterest
+    uint256 cumulativeInterest = interestDue(msg.sender);
     require(amount >= cumulativeInterest, 'Error, amount is below the minimum payment');
 
     uint256 totalOwed = currentLoan[msg.sender] + cumulativeInterest; // user owes loan and interest
     uint256 amountAfterInterest = amount - cumulativeInterest; // interest is paid off "first"
-    uint256 uncollateralizedPayOff = debt.balanceOf(msg.sender); // assume user is paying off entire uncollateralized loan
+    uint256 uncollateralizedPayOff = uncollateralizedDebt(msg.sender); // assume user is paying off entire uncollateralized loan
     uint256 newLoanStart = 0; // assume user is paying off entire loan, so loan timestamp will be cleared
     
     if (amount >= totalOwed) { // user is paying the entire amount owed 
       amount = totalOwed; // user doesnt pay too much
     } else { // user is not paying the entire amount owed
-      if (uncollateralizedPayOff > 0) { // part of the loan is uncollateralized
-        if (amountAfterInterest <= uncollateralizedPayOff) { // payment is less than uncollateralized loan
-          uncollateralizedPayOff = amountAfterInterest; // user will still have some debt after this payment
-        } 
+      if (uncollateralizedPayOff >= amountAfterInterest) { // payment is less than uncollateralized loan
+        uncollateralizedPayOff = amountAfterInterest; // user will still have some debt after this payment
       } 
       newLoanStart = block.timestamp; // reset timestamp to calculate future interest
     }
@@ -156,5 +150,54 @@ contract Bank {
     
     //emit event
     emit PayOff(msg.sender, amount, cumulativeInterest, uncollateralizedPayOff, currentLoan[msg.sender], loanStart[msg.sender]);
+  }
+
+  /* * * * * * * * * * * * * * * FUNCTION IDEAS * * * * * * * * * * * * * * */
+
+/*function prepay(uint256 amountFides) public {
+
+    user sends fides bought off the market in exchange for future uncollateralized borrowing power
+
+    if fides price > $1, this function is non profitable 
+    if fides price < $1, this function is profitable.  
+
+    goal: encourage removing fides from market when undervalued
+
+    burn fides or hold fides?
+  }
+
+  /* * * * * * * * * * * * * * * GASLESS VIEW FUNCTIONS * * * * * * * * * * * * * * */
+
+  function interestDue(address borrower) public view returns (uint256) {
+    // cumulative interest calc can be compressed into 1 line of code, seperated for readability
+    uint256 interestPerYear = currentLoan[borrower] * 0.08; // 8% of users loan
+    uint256 interestPerSecond = interestPerYear / 31557600; // 31557600 seconds = 365.25 days = 1 year
+    uint256 depositTime = block.timestamp - loanStart[borrower]; // # seconds user has borrowed 
+    return interestPerSecond * depositTime;
+  }
+
+  function uncollateralizedDebt(address borrower) public view returns (uint256) {
+
+    return debt.balanceOf(borrower);
+  }
+
+  function collateralLocked() public view returns (uint256) {
+
+    return collateral.balanceOf(address(this));
+  }
+
+  function fidesHeld() public view returns (uint256) {
+
+    return fides.balanceOf(address(this));
+  }
+
+  function fidesBorrowed() public view returns (uint256) {
+
+    return fides.totalSupply() - fidesHeld();
+  }
+
+  function fidesSupplyOverage() public view returns (int) { // not uint !!! value can be nagative
+    
+    return fides.totalSupply() - collateralLocked();
   }
 }
