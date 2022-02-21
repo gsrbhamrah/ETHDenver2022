@@ -2,29 +2,21 @@
 pragma solidity ^0.8.0;
  
 import "@openzeppelin/contracts/token/ERC20/ERC20.sol";
-import "@openzeppelin/contracts/access/Ownable.sol";
 
-contract Debt is ERC20, Ownable {
+contract Debt is ERC20 {
 
-    address[] private _banks;
+    address private _bank;
 
-    modifier onlyBanks {
-        bool isBank = false;
-        for (uint256 i = 0; i < _banks.length(); i++) {
-            if (_banks[i] == msg.sender) {
-                isBank = true;
-            }
-        }
-        require(isBank);
+    modifier onlyBank {
+        require(msg.sender == _bank);
         _;
     }
  
-    constructor() ERC20("Universal tokenized debt", "DEBT") {}
+    constructor(address bank_) ERC20("Universal tokenized debt", "DEBT") {
 
-    function addBank(address bank) public OnlyOwner {
-
-        _banks.add(bank);
+        _bank = bank_;
     }
+
 
     /* * * * * * * * * * * * * * * BANK ONLY FUNCTIONS * * * * * * * * * * * * * * */
 
@@ -32,7 +24,7 @@ contract Debt is ERC20, Ownable {
     * the bank will mint tokens to a debtor when:
     *   the debtor borrows more tokens then their deposited collateral
     */
-    function mint(address debtor, uint256 amount) public onlyBanks {
+    function mint(address debtor, uint256 amount) public onlyBank {
         
         _mint(debtor, amount); // erc20 mint
     }
@@ -41,7 +33,7 @@ contract Debt is ERC20, Ownable {
     * the bank will burn a debtors tokens when:
     *   the debtor repays any tokens that were borrowed beyond their collateral amount
     */
-    function burn(address debtor, uint256 amount) public onlyBanks {
+    function burn(address debtor, uint256 amount) public onlyBank {
         
         _burn(debtor, amount); // erc20 burn
     }
@@ -75,8 +67,8 @@ contract Debt is ERC20, Ownable {
 
     /* * * * * * * * * * * * * * * GASLESS VIEW FUNCTIONS * * * * * * * * * * * * * * */
 
-    function banks() external view returns(address[]) {
+    function banks() external view returns(address) {
         
-        return _banks;
+        return _bank;
     }
 }
